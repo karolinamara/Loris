@@ -283,7 +283,7 @@ class CouchDB
      *
      * @return string A string representation of the JSON return value from CouchDB
      */
-    function _postURL($url, $data, $headers = array())
+    function _postURL($url, $data, $headers = array(), $printValue = false)
     {
         $config      = NDB_Config::singleton();
         $couchconfig = $config->getSetting('CouchDB');
@@ -314,9 +314,17 @@ class CouchDB
         $handler->write($data);
         $response = '';
         while (!$handler->eof()) {
-            $response .= $handler->gets();
+            $line = $handler->gets();
+            if($printValue) {
+                print $line;
+            } else {
+                $response .= $handler->gets();
+            }
         }
         $handler->close();
+        if($printValue) {
+            return null;
+        }
         $response_split = explode("\r\n\r\n", $response, 2);
         return trim($response_split[1]);
     }
@@ -332,9 +340,9 @@ class CouchDB
      * @return The page content (Without headers) returned by the
      *         CouchDB web server.
      */
-    function _postRelativeURL($url, $data, $op = 'POST')
+    function _postRelativeURL($url, $data, $op = 'POST', $printValue = false)
     {
-        return $this->_postURL($this->_constructURL($op, $url), $data);
+        return $this->_postURL($this->_constructURL($op, $url), $data, $printValue);
     }
 
     /**
@@ -517,7 +525,7 @@ class CouchDB
             $url = "_design/" . $designdoc . "/_view/" . $viewname
                 . "?" . http_build_query($params);
 
-            $query = $this->_postRelativeURL($url, json_encode(array('keys' => $keys)));
+            $query = $this->_postRelativeURL($url, json_encode(array('keys' => $keys)), $full_json);
 
         } else {
             $url = "_design/" . $designdoc . "/_view/" . $viewname
