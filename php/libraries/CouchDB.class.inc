@@ -254,8 +254,7 @@ class CouchDB
             $curLine = $handler->gets();
 
             if ($finishedHeaders === false) {
-                if ($curLine == "\r\n") {// && $lastLine == "\r\n") {
-                    error_log("Finished headers");
+                if ($curLine == "\r\n") {
                     $finishedHeaders = true;
                 }
             } else { // headers are finished
@@ -280,6 +279,10 @@ class CouchDB
      * @param array  $data    Associative array representing the JSON document
      *                        to POST.
      * @param array  $headers The extra HTTP headers to send with the request
+     * @param boolean $printValue If true the return from CouchDB will be printed
+     *                            instead of returned. This avoids the overhead of
+     *                            having to parse it server-side if the request is
+     *                            expected to be directly interpreted by javascript.
      *
      * @return string A string representation of the JSON return value from CouchDB
      */
@@ -313,20 +316,26 @@ class CouchDB
         $handler->write("\r\n");
         $handler->write($data);
         $response = '';
+        $finishedHeaders = false;
         while (!$handler->eof()) {
             $line = $handler->gets();
-            if($printValue) {
-                print $line;
+            if ($finishedHeaders === false) {
+                if ($line == "\r\n") {
+                    $finishedHeaders = true;
+                }
             } else {
-                $response .= $handler->gets();
+                if($printValue) {
+                    print $line;
+                } else {
+                    $response .= $handler->gets();
+                }
             }
         }
         $handler->close();
         if($printValue) {
             return null;
         }
-        $response_split = explode("\r\n\r\n", $response, 2);
-        return trim($response_split[1]);
+        return $response;
     }
 
     /**
@@ -336,13 +345,14 @@ class CouchDB
      * @param string $data The content to be written to the URL
      *                     as the HTTP payload.
      * @param string $op   The HTTP operation to use. Default POST.
+     * @param string $full_json
      *
      * @return The page content (Without headers) returned by the
      *         CouchDB web server.
      */
     function _postRelativeURL($url, $data, $op = 'POST', $printValue = false)
     {
-        return $this->_postURL($this->_constructURL($op, $url), $data, $printValue);
+        return $this->_postURL($this->_constructURL($op, $url), $data, array(), $printValue);
     }
 
     /**
@@ -525,7 +535,7 @@ class CouchDB
             $url = "_design/" . $designdoc . "/_view/" . $viewname
                 . "?" . http_build_query($params);
 
-            $query = $this->_postRelativeURL($url, json_encode(array('keys' => $keys)), $full_json);
+            $query = $this->_postRelativeURL($url, json_encode(array('keys' => $keys)), 'POST', $full_json);
 
         } else {
             $url = "_design/" . $designdoc . "/_view/" . $viewname
