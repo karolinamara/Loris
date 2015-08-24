@@ -15,8 +15,10 @@ require_once "Utility.class.inc";
 //Configuration variables for this script, possibly installation dependent.
 //$dataDir = "dataDump" . date("dMy");
 $dumpName = "IBISdataDump" . date("dMy"); // label for dump
-$dataDir = $config['paths']['base'] . "tools/$dumpName/"; //temporary working directory
-$destinationDir = $config['paths']['base'] . "htdocs/dataDumps/csv"; //temporary working directory
+$config = NDB_Config::singleton();
+$paths = $config->getSetting('paths');
+$dataDir = $paths['base'] . "tools/$dumpName/"; //temporary working directory
+$destinationDir = $paths['base'] . "htdocs/dataDumps/csv"; //temporary working directory
 
 /*
 * Prepare output directory, if needed.
@@ -25,14 +27,17 @@ $destinationDir = $config['paths']['base'] . "htdocs/dataDumps/csv"; //temporary
 if(!file_exists($dataDir)) {
 	mkdir($dataDir);
 }
-//Delete all previous files.
-$d = dir($dataDir);
-while($entry = $d->read()) {
-	if ($entry!= "." && $entry!= "..") {
-		unlink($dataDir . "/" . $entry);
-	}
+else
+{
+    //Delete all previous files.
+        $d = dir($dataDir);
+        while($entry = $d->read()) {
+            if ($entry!= "." && $entry!= "..") {
+                unlink($dataDir . "/" . $entry);
+            }
+        }
+        $d->close();
 }
-$d->close();
 
 //Substites words for number in ProjectID data field
 function MapProjectID(&$results){
@@ -43,12 +48,13 @@ function MapProjectID(&$results){
     return $results;
 }
 //Substitute words for numbers in Subproject data field
-function MapSubprojectID(&$results) {
-    global $config;
+function MapSubprojectID(&$results, NDB_Config $config) {
+
+    $study = $config->getSetting('study');
     $subprojectLookup = array();
     // Look it up from the config file, because it's not stored
     // in the database
-    foreach($config["study"]["subprojects"]["subproject"] as $subproject) {
+    foreach($study["subprojects"]["subproject"] as $subproject) {
 	    $subprojectLookup[$subproject["id"]] =  $subproject["title"];
     }
 
@@ -103,7 +109,7 @@ foreach ($instruments as $instrument) {
 		print "Cannot pull instrument table data ".$instrument_table->getMessage()."<br>\n";
 		die();
 	}
-    MapSubprojectID($instrument_table);
+    MapSubprojectID($instrument_table, $config);
 	writeCSV($Test_name, $instrument_table, $dataDir);
 
 } //end foreach instrument
@@ -118,7 +124,7 @@ if(PEAR::isError($instrument_table)) {
 	print "Cannot figs_year3_relatives data ".$instrument_table->getMessage()."<br>\n";
 	die();
 }
-MapSubprojectID($instrument_table);
+MapSubprojectID($instrument_table, $config);
 writeCSV($Test_name, $instrument_table, $dataDir);
 
 /*
@@ -133,7 +139,7 @@ if (PEAR::isError($results)) {
 }
 
 MapProjectID($results);
-MapSubprojectID($results);
+MapSubprojectID($results, $config);
 writeCSV($Test_name, $results, $dataDir);
 
 /*
