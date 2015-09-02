@@ -182,6 +182,9 @@ echo "$tarFile ready in $destinationDir\n";
  * @param unknown_type $dataDir The  output directory.
  */
 function writeCSV($Test_name, $instrument_table, $dataDir) {
+
+    $maxColsPerFile = 1024;
+
 	//Modifiable parameters
 	$junkCols = array("CommentID", "UserID", "Examiner", "Testdate", "Data_entry_completion_status"); //columns to be removed
 
@@ -197,16 +200,57 @@ function writeCSV($Test_name, $instrument_table, $dataDir) {
 	}
 
 
-    $fp = fopen("$dataDir/$Test_name.csv", "w");
-	// add all header rows
-	$headers = array_keys($instrument_table[0]);
+    //generate one CSV file with all columns
+    $headers = array_keys($instrument_table[0]);
+    $fileNamePrefix = $dataDir . "/" . $Test_name;
+    $fullFileName = $fileNamePrefix.(count($headers) > $maxColsPerFile ? "_FULL" : "" ).".csv";
+    writeOneCSVFile($fullFileName, $headers, $instrument_table);
+
+    //if more columns than $maxColsPerFile
+    // also generate multiple CSV files with each $maxColsPerFile
+    // numb of columns
+    if (count($headers) > $maxColsPerFile) {
+        $headerChunks = array_chunk($headers, $maxColsPerFile);
+
+        $dataChunks = array();
+        foreach($instrument_table as $rowKey=>$row){
+            $rowChunks = array_chunk($row, $maxColsPerFile);
+            foreach($rowChunks as $chunkKey => $oneRowChunk){
+                $dataChunks[$chunkKey][] = $oneRowChunk;
+            }
+        }
+
+        foreach($dataChunks as $key=>$oneDataChunk){
+            writeOneCSVFile($fileNamePrefix."_part".($key+1).".csv", $headerChunks[$key], $oneDataChunk);
+        }
+    }
+
+}
+
+/**
+ * Writes one CSV file
+ *
+ * @param string $fileName CSV file path and name
+ * @param array $headers list of column names
+ * @param array $dataRows 2D array of the data to be written to CSV file
+ *
+ * @return bool true on success, false on failure
+ */
+function writeOneCSVFile($fileName, $headers, $dataRows) {
+    $fp = fopen($fileName, "w");
+    if (!$fp) {
+        echo "\n ERROR: Failed creating file ".$fileName."\n";
+        return false;
+    }
+
     fputcsv($fp, $headers);
 
-	foreach ($instrument_table as $row) {
+    foreach ($dataRows as $row) {
         fputcsv($fp, $row);
-	}
+    }
     fclose($fp);
 
+    return true;
 }
 
 /**
